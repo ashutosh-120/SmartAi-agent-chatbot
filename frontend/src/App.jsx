@@ -18,28 +18,45 @@ function App() {
 
   // Toggle analysis panel visibility
   const [showAnalysis, setShowAnalysis] = useState(false);
+  // Toggle sidebar visibility on mobile
+  const [showMobileSidebar, setShowMobileSidebar] = useState(false);
 
   // When analysis comes in, auto-show panel
   const handleAnalysis = async (repoUrl, careerGoal) => {
     setShowAnalysis(true);
+    setShowMobileSidebar(false); // Close sidebar on mobile when starting analysis
     await runAnalysis(repoUrl, careerGoal);
   };
 
   return (
-    <div className="app-root">
+    <div className={`app-root ${showMobileSidebar ? 'sidebar-open' : ''} ${showAnalysis ? 'pane-open' : ''}`}>
+      {/* ── Mobile Backdrop ──────────────────────────── */}
+      <div 
+        className="mobile-backdrop" 
+        onClick={() => { setShowMobileSidebar(false); setShowAnalysis(false); }}
+      />
+
       {/* ── Left Sidebar ─────────────────────────────── */}
       <Sidebar
         onNewChat={clearChat}
-        onAnalyze={analyzeRepo}
+        onAnalyze={(url) => { analyzeRepo(url); setShowMobileSidebar(false); }}
         onFullAnalysis={handleAnalysis}
         isLoading={isLoading || isAnalyzing}
         messageCount={messages.length}
+        showMobile={showMobileSidebar}
+        onClose={() => setShowMobileSidebar(false)}
       />
 
       {/* ── Center: Chat Area ─────────────────────────── */}
       <div className="chat-area">
         <header className="app-header">
           <div className="header-left">
+            <button 
+              className="btn btn-ghost menu-toggle" 
+              onClick={() => setShowMobileSidebar(v => !v)}
+            >
+              ☰
+            </button>
             <div className="status-dot" />
             <span className="header-status">Connected to SmartAI Backend</span>
           </div>

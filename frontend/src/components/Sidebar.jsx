@@ -16,7 +16,7 @@ const CAREER_GOALS = [
   'Backend / API Developer',
 ];
 
-const Sidebar = ({ onNewChat, onAnalyze, onFullAnalysis, isLoading, messageCount }) => {
+const Sidebar = ({ onNewChat, onAnalyze, onFullAnalysis, isLoading, messageCount, onClose }) => {
   const [repoUrl, setRepoUrl]       = useState('');
   const [careerGoal, setCareerGoal] = useState(CAREER_GOALS[0]);
 
@@ -41,6 +41,9 @@ const Sidebar = ({ onNewChat, onAnalyze, onFullAnalysis, isLoading, messageCount
           <h1 className="brand-name"><span className="text-gradient">SmartAI</span></h1>
           <p className="brand-sub">Skill & Roadmap Analyzer</p>
         </div>
+        <button className="btn btn-ghost sidebar-close" onClick={onClose}>
+          ✕
+        </button>
       </div>
 
       {/* ── New Chat ────────────────────────────────────── */}
