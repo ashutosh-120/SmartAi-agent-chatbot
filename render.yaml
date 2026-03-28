@@ -28,7 +28,7 @@ services:
   # ──────────────────────────────────────────
   # 2. Frontend Service (React/Vite)
   # ──────────────────────────────────────────
-  - type: static
+  - type: static_site
     name: smartai-frontend
     runtime: static
     buildCommand: cd frontend && npm install && npm run build
