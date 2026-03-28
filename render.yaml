@@ -12,24 +12,24 @@ services:
     startCommand: cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: GEMINI_API_KEY
-        sync: false # Set manually in Render Dashboard
+        sync: false
       - key: GITHUB_TOKEN
-        sync: false # Set manually in Render Dashboard
+        sync: false
       - key: APP_NAME
         value: SmartAI Agent Chatbot
       - key: DEBUG
         value: "False"
       - key: ALLOWED_ORIGINS
-        fromStaticSite:
+        fromService:
+          type: static
           name: smartai-frontend
           property: url
 
-staticSites:
   # ──────────────────────────────────────────
-  # 2. Frontend Service (React/Vite)
+  # 2. Frontend Service (Static Site)
   # ──────────────────────────────────────────
-  - name: smartai-frontend
-    runtime: static
+  - type: static
+    name: smartai-frontend
     buildCommand: cd frontend && npm install && npm run build
     staticPublishPath: frontend/dist
     envVars:
