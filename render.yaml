@@ -20,16 +20,15 @@ services:
       - key: DEBUG
         value: "False"
       - key: ALLOWED_ORIGINS
-        fromService:
-          type: static
+        fromStaticSite:
           name: smartai-frontend
           property: url
 
+staticSites:
   # ──────────────────────────────────────────
   # 2. Frontend Service (React/Vite)
   # ──────────────────────────────────────────
-  - type: static_site
-    name: smartai-frontend
+  - name: smartai-frontend
     runtime: static
     buildCommand: cd frontend && npm install && npm run build
     staticPublishPath: frontend/dist
