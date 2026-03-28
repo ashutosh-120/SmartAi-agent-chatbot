@@ -1,0 +1,41 @@
+# Render Blueprint for SmartAI Agent Chatbot
+# This file automates the deployment of both the FastAPI backend and React frontend.
+
+services:
+  # ──────────────────────────────────────────
+  # 1. Backend Service (FastAPI)
+  # ──────────────────────────────────────────
+  - type: web
+    name: smartai-backend
+    runtime: python
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false # Set manually in Render Dashboard
+      - key: GITHUB_TOKEN
+        sync: false # Set manually in Render Dashboard
+      - key: APP_NAME
+        value: SmartAI Agent Chatbot
+      - key: DEBUG
+        value: "False"
+      - key: ALLOWED_ORIGINS
+        fromService:
+          type: static
+          name: smartai-frontend
+          property: url
+
+  # ──────────────────────────────────────────
+  # 2. Frontend Service (React/Vite)
+  # ──────────────────────────────────────────
+  - type: static
+    name: smartai-frontend
+    runtime: static
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: frontend/dist
+    envVars:
+      - key: VITE_API_URL
+        fromService:
+          type: web
+          name: smartai-backend
+          property: url
