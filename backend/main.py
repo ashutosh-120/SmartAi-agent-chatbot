@@ -41,9 +41,13 @@ _env_origins = [
     o.strip() for o in settings.ALLOWED_ORIGINS.split(",")
 ] if hasattr(settings, "ALLOWED_ORIGINS") and settings.ALLOWED_ORIGINS else []
 
+# Auto-allow any .onrender.com domain for easier deployment
+_render_origin_regex = r"https://.*\.onrender\.com"
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_default_origins + _env_origins,
+    allow_origin_regex=_render_origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
