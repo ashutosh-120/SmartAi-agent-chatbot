@@ -14,6 +14,10 @@ const AuthPage = () => {
 
   const handleAuth = async (e) => {
     e.preventDefault()
+    if (!supabase) {
+      setError('Production Configuration Error: Supabase client is not initialized. Please check your Render environment variables (VITE_SUPABASE_URL/VITE_SUPABASE_ANON_KEY).')
+      return;
+    }
     setLoading(true)
     setError(null)
     setSuccess(null)
@@ -51,6 +55,10 @@ const AuthPage = () => {
   }
 
   const handleGithubLogin = async () => {
+    if (!supabase) {
+      setError('Configuration Error: Supabase client is not initialized.')
+      return;
+    }
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'github',

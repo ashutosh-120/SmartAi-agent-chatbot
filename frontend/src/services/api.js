@@ -20,6 +20,8 @@ const apiClient = axios.create({
 /** Request Interceptor for Auth Headers */
 apiClient.interceptors.request.use(async (config) => {
   try {
+    if (!supabase) return config; // Skip if Supabase not configured
+    
     const { data } = await supabase.auth.getSession();
     const token = data.session?.access_token;
     if (token) {

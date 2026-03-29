@@ -14,6 +14,11 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    if (!supabase) {
+      setLoading(false);
+      return;
+    }
+
     // 1. Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
@@ -28,14 +33,14 @@ export const AuthProvider = ({ children }) => {
       setLoading(false)
     })
 
-    return () => subscription.unsubscribe()
+    return () => subscription?.unsubscribe()
   }, [])
 
   const value = {
     user,
     session,
     loading,
-    signOut: () => supabase.auth.signOut(),
+    signOut: () => supabase ? supabase.auth.signOut() : Promise.resolve(),
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
