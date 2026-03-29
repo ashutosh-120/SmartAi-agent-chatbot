@@ -16,13 +16,17 @@ Public API:
 from __future__ import annotations
 
 import logging
+import json
+import time
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, Any, List, Dict
+from pydantic import BaseModel, Field
 
 from services.github_service  import analyze_repository
 from services.skill_extractor import extract_skills_from_data
 from services.trend_matcher   import match_trends, get_all_trend_names
 from services.gemini_service  import generate_roadmap, GeminiError
+from database import get_db
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +44,7 @@ class AnalysisResult:
     matched_skills:   list[str] = field(default_factory=list)
     missing_skills:   list[str] = field(default_factory=list)
     career_paths:     list[str] = field(default_factory=list)
-    roadmap:          str       = ""
+    roadmap:          Any       = field(default_factory=dict) # Now JSON object
 
     # ── Extended fields ─────────────────────────────────────
     skill_score:      int       = 0
@@ -97,28 +101,46 @@ def run_full_analysis(
     career_goal: Optional[str] = None,
 ) -> AnalysisResult:
     """
-    Execute the complete analysis pipeline end-to-end.
-
-    Steps:
-      1. Fetch & analyze GitHub repository (languages, commits, README, etc.)
-      2. Extract developer skills from repo data
-      3. Match skills against market trends
-      4. Generate a personalized roadmap with Gemini AI
-
-    Args:
-        repo_url:    GitHub repository URL.
-        career_goal: Optional target career (e.g. "AI Engineer").
-                     If not provided, uses the best trend match.
-
-    Returns:
-        AnalysisResult with all fields populated.
-
-    Raises:
-        ValueError:      Invalid URL or repo not found.
-        PermissionError: GitHub token access denied.
-        Exception:       Other GitHub API failures.
+    Runs the complete 4-step analysis pipeline with Caching and Resilience.
+    1. 📦 Fetch Data → 2. 🔍 Extract Skills → 3. 📊 Match Trends → 4. 🗺️ Create Roadmap
     """
     logger.info("Pipeline starting | url=%s | goal=%s", repo_url, career_goal)
+    
+    # ── Step 0: Check Cache (Supabase) ─────────────────────
+    # Use provided goal or a generic one for matching
+    effective_goal = career_goal or "Full Stack Web Developer"
+    
+    try:
+        db = get_db()
+        # Look for the last successful analysis for this repo URL 
+        # (Normalization: strip and lowercase)
+        norm_url = repo_url.strip().lower()
+        cache_query = db.table("analyses")\
+            .select("*")\
+            .eq("repo_url", norm_url)\
+            .order("created_at", desc=True)\
+            .limit(1)\
+            .execute()
+        
+        if cache_query.data:
+            cached = cache_query.data[0]
+            logger.info("Step 0 done | returning cached analysis for %s", repo_url)
+            return AnalysisResult(
+                skills           = cached.get("skills", []),
+                matched_skills   = cached.get("skills", []), # Approximation
+                missing_skills   = [],
+                career_paths     = [cached.get("career_goal")] if cached.get("career_goal") else [],
+                roadmap          = cached.get("roadmap_json", {}),
+                skill_score      = cached.get("skill_score", 0),
+                skill_level      = cached.get("skill_level", "beginner"),
+                repo_name        = cached.get("repo_name", "Unknown"),
+                repo_url         = cached.get("repo_url", repo_url),
+                languages        = cached.get("languages", []),
+                project_type     = "Cached Analysis",
+                complexity       = "Previously Analyzed"
+            )
+    except Exception as e:
+        logger.warning("Cache check failed (non-fatal): %s", e)
 
     # ── Step 1: Analyze GitHub repository ──────────────────
     repo = analyze_repository(repo_url)
@@ -147,27 +169,41 @@ def run_full_analysis(
     )
 
     # ── Step 4: Generate roadmap with Gemini ────────────────
-    # Use provided career_goal or fall back to best trend match
-    effective_goal = career_goal or trend.best_match or "Full Stack Web Developer"
-    roadmap_text   = ""
-    roadmap_error  = None
-
-    try:
-        roadmap_text = generate_roadmap(
-            skills        = profile.skills,
-            missing_skills= trend.missing_skills,
-            career_goal   = effective_goal,
-            skill_score   = trend.skill_score,
-            project_type  = repo.project_type,
-        )
-        logger.info("Step 4 done | roadmap_chars=%d", len(roadmap_text))
-    except GeminiError as e:
-        # Roadmap is non-fatal — return all other data even if Gemini fails
-        roadmap_error = f"Roadmap generation failed: {e}"
-        logger.warning("Step 4 failed (non-fatal): %s", e)
-    except Exception as e:
-        roadmap_error = f"Unexpected roadmap error: {e}"
-        logger.warning("Step 4 unexpected error (non-fatal): %s", e)
+    # Resilience: Try up to 3 times with backoff if rate limited
+    roadmap_data  = {}
+    roadmap_error = None
+    max_retries   = 3
+    
+    for attempt in range(max_retries):
+        try:
+            raw_roadmap = generate_roadmap(
+                skills        = profile.skills,
+                missing_skills= trend.missing_skills,
+                career_goal   = effective_goal,
+                skill_score   = trend.skill_score,
+            )
+            try:
+                roadmap_data = json.loads(raw_roadmap)
+                logger.info("Step 4 done | roadmap parsed successfully (attempt %d)", attempt + 1)
+                break 
+            except json.JSONDecodeError:
+                logger.warning("Gemini returned invalid JSON for roadmap. Using raw string.")
+                roadmap_data = {"raw_content": raw_roadmap, "error": "JSON parse failed"}
+                break
+        except GeminiError as e:
+            if "429" in str(e) and attempt < max_retries - 1:
+                wait_time = (attempt + 1) * 2 
+                logger.warning("Step 4 rate limited (429). Retrying in %ds...", wait_time)
+                time.sleep(wait_time)
+                continue
+            
+            roadmap_error = f"Roadmap generation failed: {e}"
+            logger.warning("Step 4 failed (non-fatal): %s", e)
+            break
+        except Exception as e:
+            roadmap_error = f"Unexpected roadmap error: {e}"
+            logger.warning("Step 4 unexpected error (non-fatal): %s", e)
+            break
 
     # ── Build and return AnalysisResult ────────────────────
     return AnalysisResult(
@@ -175,7 +211,7 @@ def run_full_analysis(
         matched_skills   = trend.matched_skills,
         missing_skills   = trend.missing_skills,
         career_paths     = trend.career_paths,
-        roadmap          = roadmap_text,
+        roadmap          = roadmap_data,
         skill_score      = trend.skill_score,
         confidence_score = trend.confidence_score,
         skill_level      = profile.skill_level,

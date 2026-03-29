@@ -24,8 +24,9 @@ from __future__ import annotations
 import base64
 import logging
 import re
+import concurrent.futures
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, List
 
 import httpx
 
@@ -155,6 +156,67 @@ class RepoAnalysis:
             # ── README (truncated for API response) ──
             "readme_preview": (self.readme or "")[:800] + ("..." if self.readme and len(self.readme) > 800 else ""),
         }
+
+
+# ──────────────────────────────────────────────────────────────
+#  Multi-Repo Analysis (User Profile)
+# ──────────────────────────────────────────────────────────────
+
+def analyze_user_repos(username: str, max_repos: int = 10) -> List[RepoAnalysis]:
+    """
+    Fetch and analyze all public repositories for a GitHub username.
+    Uses parallel processing to speed up analysis of multiple repos.
+
+    Args:
+        username: GitHub username (e.g., "ashutosh-120")
+        max_repos: Maximum number of original repositories to analyze.
+
+    Returns:
+        A list of RepoAnalysis objects.
+    """
+    logger.info("Analyzing user profile: %s", username)
+    
+    with httpx.Client(timeout=30.0) as client:
+        # ── 1. Fetch user's repositories ────────────────────
+        url = f"{_GITHUB_API}/users/{username}/repos"
+        resp = client.get(url, headers=_headers(), params={"sort": "updated", "per_page": 60})
+        
+        if resp.status_code == 404:
+            raise ValueError(f"GitHub user '{username}' not found.")
+        resp.raise_for_status()
+        
+        repos_data = resp.json()
+        
+        # Filter: Original repos only (optional), sorted by size/stars for maximum intelligence
+        # We focus on non-forks to see the user's actual work
+        original_repos = [r for r in repos_data if not r.get("fork")]
+        # If no original repos, fall back to anything they have
+        target_repos = original_repos if original_repos else repos_data
+        # Take the top N most significant repos
+        target_repos = target_repos[:max_repos]
+        
+    logger.info("Found %d repos for user %s. Starting parallel analysis...", len(target_repos), username)
+    
+    # ── 2. Parallel analysis ─────────────────────────────
+    results: List[RepoAnalysis] = []
+    
+    # Use a ThreadPoolExecutor for I/O bound GitHub API calls
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+        # Create a mapping of future to repo name for error tracking
+        future_to_url = {
+            executor.submit(analyze_repository, r["html_url"]): r["html_url"] 
+            for r in target_repos
+        }
+        
+        for future in concurrent.futures.as_completed(future_to_url):
+            repo_url = future_to_url[future]
+            try:
+                analysis = future.result()
+                results.append(analysis)
+            except Exception as e:
+                logger.error("Failed to analyze repo %s: %s", repo_url, e)
+                
+    return results
 
 
 # ──────────────────────────────────────────────────────────────

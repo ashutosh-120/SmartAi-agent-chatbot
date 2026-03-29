@@ -53,7 +53,59 @@ const parseCapstone = (roadmapText) => {
 const RoadmapTimeline = ({ roadmap }) => {
   const [expanded, setExpanded] = useState(null);
 
-  if (!roadmap) return null;
+  // 1. Handle missing or error states
+  if (!roadmap || (typeof roadmap === 'object' && Object.keys(roadmap).length === 0)) {
+    return (
+      <div className="empty-state">
+        <p>No roadmap data available. Try running the analysis again.</p>
+      </div>
+    );
+  }
+
+  // 2. Handle Structured JSON Roadmap (New Format)
+  if (typeof roadmap === 'object' && roadmap.phases) {
+    const phases = roadmap.phases || [];
+    return (
+      <div className="roadmap-timeline">
+        <h3 className="section-heading">
+          <span className="section-icon">🗺️</span> Career Roadmap
+          <span className="week-count">{phases.length} Phases</span>
+        </h3>
+        <div className="timeline-container">
+          {phases.map((phase, i) => (
+            <div
+              key={i}
+              className={`week-card ${expanded === i ? 'expanded' : ''}`}
+              onClick={() => setExpanded(expanded === i ? null : i)}
+            >
+              <div className="timeline-connector">
+                <div className="timeline-dot">{i + 1}</div>
+                {i < phases.length - 1 && <div className="timeline-line" />}
+              </div>
+              <div className="week-content">
+                <div className="week-header">
+                  <h4 className="week-title">{phase.title}</h4>
+                  <span className="expand-icon">{expanded === i ? '▲' : '▼'}</span>
+                </div>
+                <p className="week-focus">{phase.description}</p>
+                {expanded === i && phase.tasks && (
+                  <div className="week-details">
+                    <span className="label">📚 Tasks:</span>
+                    <ul>
+                      {phase.tasks.map((task, j) => <li key={j}>{task}</li>)}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // 3. Fallback to Markdown Parsing (Legacy Format)
+  if (typeof roadmap !== 'string') return null;
 
   const weeks    = parseWeeks(roadmap);
   const overview = parseOverview(roadmap);

@@ -5,6 +5,7 @@
  */
 
 import axios from 'axios';
+import { supabase } from '../lib/supabase';
 
 // ── Base URL: env var for prod, localhost for dev ──────────
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -13,7 +14,21 @@ const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 const apiClient = axios.create({
   baseURL: BASE_URL,
   headers: { 'Content-Type': 'application/json' },
-  timeout: 90000, // 90s — Gemini roadmap generation can take ~30-60s
+  timeout: 120000, // 120s — Gemini roadmap generation can take ~40-80s
+});
+
+/** Request Interceptor for Auth Headers */
+apiClient.interceptors.request.use(async (config) => {
+  try {
+    const { data } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+  } catch (err) {
+    console.error('Error attaching auth header:', err);
+  }
+  return config;
 });
 
 // ──────────────────────────────────────────
@@ -83,6 +98,19 @@ export const runFullAnalysis = async (repoUrl, careerGoal = null) => {
  */
 export const extractSkills = async (repoUrl) => {
   const response = await apiClient.post('/api/github/skills', { repo_url: repoUrl });
+  return response.data;
+};
+
+// ──────────────────────────────────────────
+//  History & Profile
+// ──────────────────────────────────────────
+
+/**
+ * Fetch the user's past repository analyses.
+ * @param {number} limit - Number of records to return.
+ */
+export const fetchHistory = async (limit = 10) => {
+  const response = await apiClient.get(`/history?limit=${limit}`);
   return response.data;
 };
 

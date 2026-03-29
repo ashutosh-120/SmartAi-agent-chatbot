@@ -212,53 +212,55 @@ def _compute_skill_level(
     complexity: str,
 ) -> tuple[str, int]:
     """
-    Compute skill level using an additive scoring model.
-
-    Returns (skill_level: str, score: int) so callers can inspect the score.
-
-    Scoring dimensions:
-      • Commit history   — depth of involvement
-      • Community signal — stars + forks = external validation
-      • Repo size        — scope of the project
-      • Breadth          — number of languages + frameworks used
-      • Complexity       — derived from prompt-3 analysis
+    Compute a granular 0-100 skill score and map to a categorical level.
+    
+    Weights:
+    - Experience (Commits): 30%
+    - Traction (Stars/Forks): 20%
+    - Scale (Repo Size): 20%
+    - Breadth (Tech Count): 15%
+    - Depth (Complexity): 15%
     """
     score = 0
 
-    # ── Commit history (development experience) ────────────
-    if commit_count >= 500:   score += 4
-    elif commit_count >= 100: score += 3
-    elif commit_count >= 30:  score += 2
-    elif commit_count >= 5:   score += 1
+    # 1. Experience (Commits) — max 30 pts
+    if commit_count >= 1000: score += 30
+    elif commit_count >= 500: score += 25
+    elif commit_count >= 200: score += 15
+    elif commit_count >= 50:  score += 10
+    elif commit_count >= 10:  score += 5
 
-    # ── Community signal (external validation) ─────────────
-    community = stars + forks
-    if community >= 1000:  score += 4
-    elif community >= 100: score += 3
-    elif community >= 10:  score += 2
-    elif community >= 1:   score += 1
+    # 2. Traction (Community) — max 20 pts
+    traction = stars + (forks * 2) # forks are more weighted signs of utility
+    if traction >= 5000: score += 20
+    elif traction >= 1000: score += 18
+    elif traction >= 100:  score += 12
+    elif traction >= 10:   score += 5
+    elif traction >= 1:    score += 2
 
-    # ── Repo size (scope / effort) ─────────────────────────
-    if repo_size_kb >= 50_000:   score += 3
-    elif repo_size_kb >= 10_000: score += 2
-    elif repo_size_kb >= 1_000:  score += 1
+    # 3. Scale (Size) — max 20 pts (binary logic)
+    if repo_size_kb >= 100_000: score += 20
+    elif repo_size_kb >= 50_000:  score += 15
+    elif repo_size_kb >= 10_000:  score += 10
+    elif repo_size_kb >= 1_000:   score += 5
 
-    # ── Breadth of tech used ────────────────────────────────
-    breadth = language_count + framework_count
-    if breadth >= 10:  score += 3
-    elif breadth >= 6: score += 2
-    elif breadth >= 3: score += 1
+    # 4. Breadth (Tech) — max 15 pts
+    tech_breadth = language_count + framework_count
+    if tech_breadth >= 12: score += 15
+    elif tech_breadth >= 8: score += 12
+    elif tech_breadth >= 4: score += 7
+    elif tech_breadth >= 2: score += 3
 
-    # ── Complexity bonus ────────────────────────────────────
-    complexity_bonus = {"Low": 0, "Medium": 1, "High": 2, "Very High": 3}
-    score += complexity_bonus.get(complexity, 0)
+    # 5. Depth (Complexity) — max 15 pts
+    complexity_map = {"Very High": 15, "High": 12, "Medium": 7, "Low": 2}
+    score += complexity_map.get(complexity, 0)
 
-    # ── Map score to level ──────────────────────────────────
-    if score >= 11:  level = "advanced"
-    elif score >= 5: level = "intermediate"
+    # Map to categorical levels
+    if score >= 75:   level = "advanced"
+    elif score >= 35: level = "intermediate"
     else:            level = "beginner"
 
-    return level, score
+    return level, min(score, 100)
 
 
 # ══════════════════════════════════════════════════════════════

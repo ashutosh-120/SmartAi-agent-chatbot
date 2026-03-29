@@ -1,6 +1,5 @@
 /**
- * components/Sidebar.jsx — Enhanced Sidebar (Prompt-5)
- * Adds: Full Analysis section with career goal selector, updated branding.
+ * components/Sidebar.jsx — Enhanced Sidebar with User Profile
  */
 
 import { useState } from 'react';
@@ -16,11 +15,13 @@ const CAREER_GOALS = [
   'Backend / API Developer',
 ];
 
-const Sidebar = ({ onNewChat, onAnalyze, onFullAnalysis, isLoading, messageCount, onClose }) => {
+const Sidebar = ({ 
+  onNewChat, onAnalyze, onFullAnalysis, isLoading, messageCount, 
+  onClose, user, onSignOut, history = [], isHistoryLoading = false, onLoadAnalysis 
+}) => {
   const [repoUrl, setRepoUrl]       = useState('');
   const [careerGoal, setCareerGoal] = useState(CAREER_GOALS[0]);
 
-  // Real-time validation
   const parts = repoUrl.trim().replace(/\/$/, '').split('/');
   const isProfile = parts.length === 4 && parts[2] === 'github.com';
   const isRepo = (parts.length >= 5 && parts[2] === 'github.com') || (parts.length === 2 && !repoUrl.includes('://'));
@@ -32,6 +33,46 @@ const Sidebar = ({ onNewChat, onAnalyze, onFullAnalysis, isLoading, messageCount
     onFullAnalysis(repoUrl.trim(), goal);
   };
 
+  // ── History Section ───────────────────────────────────
+  const renderHistory = () => {
+    if (isHistoryLoading) {
+      return <div className="history-loading"><span className="spinner-sm" /> Loading history...</div>;
+    }
+    if (history.length === 0) {
+      return <div className="history-empty">No analyses yet.</div>;
+    }
+
+    return (
+      <div className="history-list">
+        {history.map((item, idx) => (
+          <div 
+            key={idx} 
+            className="history-item" 
+            onClick={() => onLoadAnalysis(item)}
+            title={`Analyze ${item.repo_name}`}
+          >
+            <div className="history-item-icon">📄</div>
+            <div className="history-item-content">
+              <div className="history-item-name">{item.repo_name?.split('/').pop() || item.repo_url?.split('/').pop()}</div>
+              <div className="history-item-meta">
+                <span className="history-score">{item.skill_score}%</span>
+                <span className="history-dot">•</span>
+                <span className="history-level">{item.skill_level}</span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  // Derive user info
+  const userEmail = user?.email || 'Guest';
+  const userInitial = userEmail.charAt(0).toUpperCase();
+  const userProvider = user?.app_metadata?.provider || 'email';
+  const githubUsername = user?.user_metadata?.user_name || null;
+  const avatarUrl = user?.user_metadata?.avatar_url || null;
+
   return (
     <aside className="sidebar">
       {/* ── Brand ──────────────────────────────────────── */}
@@ -41,10 +82,40 @@ const Sidebar = ({ onNewChat, onAnalyze, onFullAnalysis, isLoading, messageCount
           <h1 className="brand-name"><span className="text-gradient">SmartAI</span></h1>
           <p className="brand-sub">Skill & Roadmap Analyzer</p>
         </div>
-        <button className="btn btn-ghost sidebar-close" onClick={onClose}>
-          ✕
-        </button>
+        <button className="btn btn-ghost sidebar-close" onClick={onClose}>✕</button>
       </div>
+
+      {/* ── User Profile Card ──────────────────────────── */}
+      {user && (
+        <div className="user-profile-card">
+          <div className="user-avatar">
+            {avatarUrl ? (
+              <img src={avatarUrl} alt="avatar" className="user-avatar-img" />
+            ) : (
+              <span className="user-avatar-initial">{userInitial}</span>
+            )}
+            <span className="user-online-dot" />
+          </div>
+          <div className="user-info">
+            <div className="user-name">
+              {githubUsername ? `@${githubUsername}` : userEmail.split('@')[0]}
+            </div>
+            <div className="user-email">{userEmail}</div>
+            <div className="user-provider-badge">
+              {userProvider === 'github' ? '🐙 GitHub' : '✉️ Email'}
+            </div>
+          </div>
+          <button
+            className="btn btn-ghost sign-out-btn"
+            onClick={onSignOut}
+            title="Sign out"
+          >
+            ⏻
+          </button>
+        </div>
+      )}
+
+      <div className="sidebar-divider" />
 
       {/* ── New Chat ────────────────────────────────────── */}
       <button onClick={onNewChat} className="btn btn-ghost new-chat-btn">
@@ -107,6 +178,16 @@ const Sidebar = ({ onNewChat, onAnalyze, onFullAnalysis, isLoading, messageCount
 
       <div className="sidebar-divider" />
 
+      {/* ── Recent Analyses (History) ────────────────────── */}
+      <div className="sidebar-section">
+        <div className="section-label">
+          <span>📜</span> Recent Analyses
+        </div>
+        {renderHistory()}
+      </div>
+
+      <div className="sidebar-divider" />
+
       {/* ── Quick GitHub Q&A ───────────────────────────── */}
       <div className="sidebar-section">
         <div className="section-label">
@@ -118,7 +199,7 @@ const Sidebar = ({ onNewChat, onAnalyze, onFullAnalysis, isLoading, messageCount
 
       <div className="sidebar-divider" />
 
-      {/* ── Features ───────────────────────────────────── */}
+      {/* ── Capabilities ───────────────────────────────── */}
       <div className="capabilities">
         <p className="cap-label">CAPABILITIES</p>
         {[

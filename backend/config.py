@@ -24,7 +24,12 @@ class Settings:
     DEBUG: bool = os.getenv("DEBUG", "True").lower() == "true"
     ALLOWED_ORIGINS: str = os.getenv("ALLOWED_ORIGINS", "")
 
-    # Gemini model to use — gemini-2.0-flash is the current stable GA model
+    # Supabase
+    SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
+    SUPABASE_ANON_KEY: str = os.getenv("SUPABASE_ANON_KEY", "")
+    SUPABASE_SERVICE_ROLE_KEY: str = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+
+    # Gemini model 
     GEMINI_MODEL: str = "gemini-2.0-flash"
 
     # GitHub API base URL

@@ -8,6 +8,8 @@ import { useState } from 'react';
 import SkillCard from './SkillCard';
 import CareerPaths from './CareerPaths';
 import RoadmapTimeline from './RoadmapTimeline';
+import SkillRadarChart from './SkillRadarChart';
+import LanguageBreakdown from './LanguageBreakdown';
 
 const TABS = [
   { id: 'skills',   icon: '🧠', label: 'Skills'         },
@@ -112,12 +114,22 @@ const AnalysisPanel = ({ data, repoName }) => {
       <div className="tab-content">
 
         {activeTab === 'skills' && (
-          <div>
-            <div className="languages-row">
-              <strong>Languages:</strong>
-              {languages.map((l, i) => <SkillCard key={i} skill={l} category="Languages" />)}
-              {frameworks.slice(0, 5).map((f, i) => <SkillCard key={i} skill={f} category="Frameworks" />)}
+          <div className="skills-tab-content">
+            {/* Visual Charts Row */}
+            <div className="visuals-row">
+              <div className="visual-card">
+                <h4 className="visual-title">Skill Depth Area</h4>
+                <SkillRadarChart 
+                  categories={skill_categories} 
+                  globalScore={skill_score} 
+                />
+              </div>
+              <div className="visual-card">
+                <h4 className="visual-title">Language DNA</h4>
+                <LanguageBreakdown languages={languages} />
+              </div>
             </div>
+
             <div className="skills-by-category">
               {Object.entries(skill_categories).map(([cat, catSkills]) => (
                 <div key={cat} className="skill-category-group">

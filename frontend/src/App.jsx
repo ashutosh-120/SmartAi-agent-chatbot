@@ -1,38 +1,61 @@
 /**
- * App.jsx — Root Application Component (Prompt-5 Enhanced)
- * Layout: Sidebar (left) | Chat (center/right) | AnalysisPanel (right panel)
+ * App.jsx — Root Application Component
+ * Routes between AuthPage (logged out) and main app (logged in)
  */
 
 import { useState } from 'react';
 import './index.css';
-import Sidebar      from './components/Sidebar';
-import ChatWindow   from './components/ChatWindow';
+import Sidebar       from './components/Sidebar';
+import ChatWindow    from './components/ChatWindow';
 import AnalysisPanel from './components/AnalysisPanel';
-import { useChat }  from './hooks/useChat';
+import AuthPage      from './pages/AuthPage';
+import { useChat }   from './hooks/useChat';
+import { useAuth }   from './hooks/useAuth.jsx';
 
 function App() {
+  const { user, loading, signOut } = useAuth();
+
   const {
     messages, isLoading, sendMessage, analyzeRepo, clearChat,
     analysisData, analysisRepo, isAnalyzing, analysisError, runAnalysis,
+    history, isHistoryLoading, loadAnalysis,
   } = useChat();
 
-  // Toggle analysis panel visibility
   const [showAnalysis, setShowAnalysis] = useState(false);
-  // Toggle sidebar visibility on mobile
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
 
-  // When analysis comes in, auto-show panel
   const handleAnalysis = async (repoUrl, careerGoal) => {
     setShowAnalysis(true);
-    setShowMobileSidebar(false); // Close sidebar on mobile when starting analysis
+    setShowMobileSidebar(false);
     await runAnalysis(repoUrl, careerGoal);
   };
 
+  const handleLoadHistory = (item) => {
+    loadAnalysis(item);
+    setShowAnalysis(true);
+    setShowMobileSidebar(false);
+  };
+
+  // ── Loading state while Supabase checks the session ──
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', height: '100dvh', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-primary)' }}>
+        <div className="spinner large" />
+      </div>
+    );
+  }
+
+  // ── Not logged in → show Auth page ──
+  if (!user) {
+    return <AuthPage />;
+  }
+
+  // ── Logged in → show the main app ──
   return (
     <div className={`app-root ${showMobileSidebar ? 'sidebar-open' : ''} ${showAnalysis ? 'pane-open' : ''}`}>
       {/* ── Mobile Backdrop ──────────────────────────── */}
-      <div 
-        className="mobile-backdrop" 
+      <div
+        className="mobile-backdrop"
         onClick={() => { setShowMobileSidebar(false); setShowAnalysis(false); }}
       />
 
@@ -45,20 +68,25 @@ function App() {
         messageCount={messages.length}
         showMobile={showMobileSidebar}
         onClose={() => setShowMobileSidebar(false)}
+        user={user}
+        onSignOut={signOut}
+        history={history}
+        isHistoryLoading={isHistoryLoading}
+        onLoadAnalysis={handleLoadHistory}
       />
 
       {/* ── Center: Chat Area ─────────────────────────── */}
       <div className="chat-area">
         <header className="app-header">
           <div className="header-left">
-            <button 
-              className="btn btn-ghost menu-toggle" 
+            <button
+              className="btn btn-ghost menu-toggle"
               onClick={() => setShowMobileSidebar(v => !v)}
             >
               ☰
             </button>
             <div className="status-dot" />
-            <span className="header-status">Connected to SmartAI Backend</span>
+            <span className="header-status">SmartAI Developer Intelligence</span>
           </div>
           <div className="header-right">
             <span className="model-badge">Gemini 2.0 Flash</span>

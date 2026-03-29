@@ -3,8 +3,8 @@
  * Manages messages, analysis results, loading states, and error handling.
  */
 
-import { useState, useCallback } from 'react';
-import { chatWithAI, analyzeGitHubRepo, runFullAnalysis } from '../services/api';
+import { useState, useCallback, useEffect } from 'react';
+import { chatWithAI, analyzeGitHubRepo, runFullAnalysis, fetchHistory } from '../services/api';
 
 const generateId = () => `msg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
@@ -26,6 +26,37 @@ export const useChat = () => {
   const [analysisRepo, setAnalysisRepo]   = useState('');
   const [isAnalyzing, setIsAnalyzing]     = useState(false);
   const [analysisError, setAnalysisError] = useState(null);
+
+  // ── History state ──────────────────────────────────────
+  const [history, setHistory]             = useState([]);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+
+  // ──────────────────────────────────────────
+  //  0. History Management
+  // ──────────────────────────────────────────
+  const getHistory = useCallback(async () => {
+    setIsHistoryLoading(true);
+    try {
+      const data = await fetchHistory(10);
+      setHistory(data);
+    } catch (err) {
+      console.error('Failed to fetch history:', err);
+    } finally {
+      setIsHistoryLoading(false);
+    }
+  }, []);
+
+  const loadAnalysis = useCallback((item) => {
+    // History endpoint returns AnalyzeResponse structure
+    setAnalysisData(item);
+    setAnalysisRepo(item.repo_name || item.repo_url);
+    setAnalysisError(null);
+  }, []);
+
+  // Fetch history once on mount
+  useEffect(() => {
+    getHistory();
+  }, [getHistory]);
 
   // ──────────────────────────────────────────
   //  1. Chat with Gemini (multi-turn)
@@ -109,6 +140,9 @@ export const useChat = () => {
         repoName:    data.repo_name,
         careerPaths: data.career_paths?.slice(0, 3),
       })]);
+
+      // Refresh history list
+      getHistory();
     } catch (err) {
       let msg = 'Analysis failed.';
       if (err.response) {
@@ -144,5 +178,7 @@ export const useChat = () => {
     messages, isLoading, error, sendMessage, analyzeRepo, clearChat,
     // Full analysis
     analysisData, analysisRepo, isAnalyzing, analysisError, runAnalysis,
+    // History
+    history, isHistoryLoading, getHistory, loadAnalysis,
   };
 };
